@@ -10,7 +10,7 @@
   PDF/PPT → HWPX   : 페이지 이미지를 한글(HWPX) 문서로 배치
 """
 import io
-import os
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -27,6 +27,9 @@ _MM_PER_PT = 25.4 / 72
 _EMU_PER_PT = 12700
 
 
+logger = logging.getLogger("converter")
+
+
 class ConversionError(Exception):
     pass
 
@@ -41,8 +44,16 @@ def _run(cmd: list[str], cwd: Path | None = None) -> None:
     except subprocess.TimeoutExpired:
         raise ConversionError("변환 시간이 초과되었습니다.")
     if proc.returncode != 0:
-        detail = (proc.stderr or proc.stdout or b"")[:500].decode("utf-8", "replace")
-        raise ConversionError(f"변환에 실패했습니다. ({detail.strip() or 'unknown error'})")
+        # 내부 오류 상세는 서버 로그에만 남기고, 사용자에게는 일반화된 메시지만 보낸다
+        detail = (proc.stderr or proc.stdout or b"")[:4000].decode("utf-8", "replace")
+        logger.error("conversion subprocess failed (rc=%s, cmd=%s): %s",
+                      proc.returncode, cmd[0], detail.strip())
+        lowered = detail.lower()
+        if "password" in lowered or "encrypt" in lowered or "distribut" in lowered:
+            raise ConversionError("암호화되었거나 배포용(보안) 문서는 변환할 수 없습니다.")
+        raise ConversionError(
+            "파일을 변환하지 못했습니다. 문서가 손상되었거나 "
+            "지원하지 않는 형식·기능을 포함하고 있을 수 있습니다.")
 
 
 def _soffice_convert(src: Path, target_ext: str, outdir: Path) -> Path:
@@ -63,12 +74,11 @@ def _soffice_convert(src: Path, target_ext: str, outdir: Path) -> Path:
 
 
 def _hwp_to_odt(src: Path, outdir: Path) -> Path:
-    exe = Path(sys.executable).parent / ("hwp5odt.exe" if os.name == "nt" else "hwp5odt")
-    if not exe.exists():
-        raise ConversionError("HWP 변환 도구(pyhwp)가 설치되어 있지 않습니다.")
+    # RelaxNG 검증을 끈 전용 워커 사용 — hwp5odt_worker.py 참고
+    worker = Path(__file__).with_name("hwp5odt_worker.py")
     out = outdir / f"{src.stem}.odt"
-    _run([str(exe), "--output", str(out), str(src)])
-    if not out.exists():
+    _run([sys.executable, str(worker), str(src), str(out)])
+    if not out.exists() or out.stat().st_size == 0:
         raise ConversionError("HWP 파일을 읽지 못했습니다. 암호화되었거나 지원하지 않는 버전일 수 있습니다.")
     return out
 
