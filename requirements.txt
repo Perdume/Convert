@@ -1,0 +1,11 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+PyMuPDF>=1.24
+python-pptx>=0.6.23
+Pillow>=10.0
+pyhwp>=0.1b15
+six>=1.16
+lxml>=5.0
+olefile>=0.47
+python-hwpx>=2.9

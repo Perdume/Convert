@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <title>문서 변환기 — HWP · PPT · PDF</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="card">
+    <h1>문서 변환기</h1>
+    <p class="subtitle">한글(HWP) · 파워포인트(PPT) · PDF를 서로 변환합니다</p>
+
+    <div id="dropzone" class="dropzone" tabindex="0" role="button"
+         aria-label="파일 선택 또는 드래그">
+      <input type="file" id="fileInput" accept=".hwp,.ppt,.pptx,.pdf" hidden>
+      <div id="dropzoneIdle">
+        <div class="dz-icon">&#128196;</div>
+        <p><strong>파일을 끌어다 놓거나 클릭하여 선택</strong></p>
+        <p class="dz-hint">HWP, PPT/PPTX, PDF · 최대 50MB</p>
+      </div>
+      <div id="dropzoneFile" hidden>
+        <p id="fileName" class="file-name"></p>
+        <p id="fileSize" class="dz-hint"></p>
+        <button type="button" id="clearFile" class="link-btn">다른 파일 선택</button>
+      </div>
+    </div>
+
+    <div id="targetSection" class="target-section" hidden>
+      <p class="label">변환할 형식</p>
+      <div id="targetOptions" class="target-options"></div>
+      <button type="button" id="convertBtn" class="primary-btn" disabled>변환하기</button>
+    </div>
+
+    <div id="progress" class="progress" hidden>
+      <div class="spinner"></div>
+      <p>변환 중입니다… 잠시만 기다려주세요.</p>
+    </div>
+
+    <div id="result" class="result" hidden>
+      <p class="result-title">&#9989; 변환이 완료되었습니다</p>
+      <a id="downloadLink" class="primary-btn" download>다운로드</a>
+      <p class="dz-hint">다운로드하면 서버에서 파일이 즉시 삭제됩니다.<br>
+        다운로드하지 않아도 10분 뒤 자동 삭제됩니다.</p>
+      <button type="button" id="restartBtn" class="link-btn">새 파일 변환하기</button>
+    </div>
+
+    <div id="error" class="error" hidden>
+      <p id="errorMsg"></p>
+      <button type="button" id="retryBtn" class="link-btn">다시 시도</button>
+    </div>
+
+    <footer>
+      <ul class="security-notes">
+        <li>&#128274; 모든 변환은 서버 내부에서만 처리되며 외부로 전송되지 않습니다.</li>
+        <li>&#128465;&#65039; 업로드한 원본은 변환 즉시, 결과물은 다운로드 즉시 완전 삭제됩니다.</li>
+        <li>&#128196; 한글 형식으로의 변환 결과는 HWPX(한글 2014 이상)로 저장됩니다.</li>
+      </ul>
+    </footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
