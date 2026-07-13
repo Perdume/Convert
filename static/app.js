@@ -3,11 +3,25 @@
 const MAX_BYTES = 50 * 1024 * 1024;
 const EXT_TO_FMT = { hwp: "hwp", ppt: "ppt", pptx: "pptx", pdf: "pdf" };
 const TARGETS = {
-  hwp:  [{ value: "pdf", label: "PDF" }, { value: "pptx", label: "PPT (PPTX)" }],
-  ppt:  [{ value: "pdf", label: "PDF" }, { value: "hwpx", label: "한글 (HWPX)" }],
-  pptx: [{ value: "pdf", label: "PDF" }, { value: "hwpx", label: "한글 (HWPX)" }],
-  pdf:  [{ value: "pptx", label: "PPT (PPTX)" }, { value: "hwpx", label: "한글 (HWPX)" }],
+  hwp:  [{ value: "pdf", label: "PDF" }, { value: "pptx", label: "PPT (PPTX)" },
+         { value: "docx", label: "워드 (DOCX)" }],
+  ppt:  [{ value: "pdf", label: "PDF" }, { value: "hwpx", label: "한글 (HWPX)" },
+         { value: "docx", label: "워드 (DOCX)" }],
+  pptx: [{ value: "pdf", label: "PDF" }, { value: "hwpx", label: "한글 (HWPX)" },
+         { value: "docx", label: "워드 (DOCX)" }],
+  pdf:  [{ value: "pptx", label: "PPT (PPTX)" }, { value: "hwpx", label: "한글 (HWPX)" },
+         { value: "docx", label: "워드 (DOCX)" }],
 };
+
+// 형식별 안내 문구: [소스형식 무관 기본, HWP 소스일 때]
+const HINTS = {
+  pdf:  "어디서나 동일하게 보이는 문서 형식입니다.",
+  pptx: "각 페이지가 고해상도 이미지 슬라이드로 들어갑니다. 모양은 원본 그대로지만 텍스트 편집은 제한됩니다.",
+  hwpx: "한글 2014 이상에서 열리는 형식입니다. 각 페이지가 이미지로 들어가 모양은 유지되지만 텍스트 편집은 제한됩니다.",
+  docx: "한컴오피스가 없어도 MS 워드·구글 문서(Docs)에서 열 수 있습니다.",
+};
+const HINT_DOCX_FROM_HWP = "한컴오피스가 없어도 MS 워드·구글 문서(Docs)에서 열고 편집할 수 있습니다. 복잡한 서식은 일부 달라질 수 있습니다.";
+const HINT_DOCX_FROM_PAGES = "한컴오피스나 오피스 프로그램이 없어도 MS 워드·구글 문서(Docs)에서 열 수 있습니다. 각 페이지가 이미지로 들어가 텍스트 편집은 제한됩니다.";
 
 const $ = (id) => document.getElementById(id);
 let selectedFile = null;
@@ -55,12 +69,24 @@ function pickFile(file) {
     input.name = "target";
     input.value = t.value;
     if (i === 0) input.checked = true;
+    input.addEventListener("change", () => updateHint(fmt));
     label.appendChild(input);
     label.appendChild(document.createTextNode(t.label));
     opts.appendChild(label);
   });
+  updateHint(fmt);
   $("convertBtn").disabled = false;
   show("picked");
+}
+
+function updateHint(srcFmt) {
+  const checked = document.querySelector('input[name="target"]:checked');
+  if (!checked) return;
+  let hint = HINTS[checked.value] || "";
+  if (checked.value === "docx") {
+    hint = srcFmt === "hwp" ? HINT_DOCX_FROM_HWP : HINT_DOCX_FROM_PAGES;
+  }
+  $("targetHint").textContent = hint;
 }
 
 async function convert() {

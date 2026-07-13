@@ -18,7 +18,7 @@ RATE_LIMIT_MAX = 10                       # IP당 분당 변환 요청 수
 RATE_LIMIT_WINDOW = 60
 
 INPUT_FORMATS = {"hwp", "ppt", "pptx", "pdf"}
-OUTPUT_FORMATS = {"pdf", "pptx", "hwpx"}
+OUTPUT_FORMATS = {"pdf", "pptx", "hwpx", "docx"}
 
 
 def _find_soffice() -> str | None:

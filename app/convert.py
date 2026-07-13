@@ -135,6 +135,33 @@ def _pdf_to_hwpx(pdf_path: Path, outdir: Path) -> Path:
     return out
 
 
+def _pdf_to_docx(pdf_path: Path, outdir: Path) -> Path:
+    """PDF 페이지를 전면 이미지로 배치한 워드 문서를 만든다."""
+    from docx import Document
+    from docx.shared import Emu
+
+    doc = Document()
+    section = doc.sections[0]
+    first = True
+    for png, w_pt, h_pt in _render_pdf_pages(pdf_path):
+        if first:
+            section.page_width = Emu(int(w_pt * _EMU_PER_PT))
+            section.page_height = Emu(int(h_pt * _EMU_PER_PT))
+            section.left_margin = section.right_margin = Emu(0)
+            section.top_margin = section.bottom_margin = Emu(0)
+            section.header_distance = section.footer_distance = Emu(0)
+            first = False
+        p = doc.add_paragraph()  # 한 문단 = 한 페이지
+        p.paragraph_format.space_before = Emu(0)
+        p.paragraph_format.space_after = Emu(0)
+        p.add_run().add_picture(io.BytesIO(png),
+                                width=Emu(int(w_pt * _EMU_PER_PT)),
+                                height=Emu(int(h_pt * _EMU_PER_PT)))
+    out = outdir / "result.docx"
+    doc.save(str(out))
+    return out
+
+
 def _to_pdf(src: Path, src_fmt: str, outdir: Path) -> Path:
     if src_fmt == "pdf":
         return src
@@ -161,4 +188,11 @@ def convert(src: Path, src_fmt: str, target: str, outdir: Path) -> Path:
         if src_fmt == "hwp":
             raise ConversionError("이미 한글 파일입니다.")
         return _pdf_to_hwpx(_to_pdf(src, src_fmt, outdir), outdir)
+    if target == "docx":
+        # 한컴오피스 없이 MS워드·구글 Docs에서 열 수 있는 형식.
+        # HWP는 문서를 해석해 편집 가능한 워드로, PDF/PPT는 페이지 이미지로 배치한다.
+        if src_fmt == "hwp":
+            odt = _hwp_to_odt(src, outdir)
+            return _soffice_convert(odt, "docx", outdir)
+        return _pdf_to_docx(_to_pdf(src, src_fmt, outdir), outdir)
     raise ConversionError("지원하지 않는 변환 형식입니다.")

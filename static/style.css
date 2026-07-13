@@ -51,7 +51,9 @@ h1 { font-size: 1.6rem; text-align: center; }
 .target-section { margin-top: 20px; }
 .label { font-size: 0.88rem; font-weight: 600; margin-bottom: 8px; }
 
-.target-options { display: flex; gap: 8px; margin-bottom: 16px; }
+.target-options { display: flex; gap: 8px; margin-bottom: 8px; }
+
+.target-hint { margin: 0 2px 14px; line-height: 1.5; min-height: 2.4em; }
 
 .target-options label {
   flex: 1;
