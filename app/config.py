@@ -13,7 +13,7 @@ MAX_PDF_PAGES = 300                       # 이미지 변환 시 페이지 상�
 JOB_TTL_SECONDS = 600                     # 미다운로드 결과물 최대 보관 시간
 SWEEP_INTERVAL_SECONDS = 30
 CONVERT_TIMEOUT_SECONDS = 180
-MAX_CONCURRENT_CONVERSIONS = 2
+MAX_CONCURRENT_CONVERSIONS = int(os.environ.get("MAX_CONCURRENT_CONVERSIONS", "2"))
 RATE_LIMIT_MAX = 10                       # IP당 분당 변환 요청 수
 RATE_LIMIT_WINDOW = 60
 

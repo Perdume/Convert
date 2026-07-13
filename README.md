@@ -37,6 +37,15 @@
 
 ## 실행 방법
 
+### Render 원클릭 배포 (무료)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Perdume/Convert)
+
+1. 위 버튼 클릭 → GitHub 계정으로 Render 로그인
+2. 서비스 이름 확인 후 **Apply** → 빌드가 끝나면 `https://<이름>.onrender.com` 주소로 접속
+
+> 무료 플랜은 15분간 요청이 없으면 잠들었다가 첫 접속 시 30초~1분 정도 걸려 깨어납니다.
+
 ### Windows (로컬)
 
 사전 설치: [Python 3.12+](https://www.python.org/downloads/), [LibreOffice](https://www.libreoffice.org/download/)

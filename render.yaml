@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: convert
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: CONVERT_DATA_DIR
+        value: /tmp/convert-data
+      # 무료 플랜(512MB)에서는 LibreOffice 동시 실행을 1건으로 제한
+      - key: MAX_CONCURRENT_CONVERSIONS
+        value: "1"
