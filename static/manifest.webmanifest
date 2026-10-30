@@ -1,0 +1,19 @@
+{
+  "name": "문서 변환기 — HWP·PDF·오피스",
+  "short_name": "문서 변환기",
+  "description": "HWP·PDF·워드·엑셀·파워포인트·이미지를 서로 변환하고, 암호가 걸린 문서는 비밀번호를 입력해 해제한 뒤 변환합니다. 파일은 서버에서 처리 후 즉시 삭제됩니다.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1424",
+  "theme_color": "#6366f1",
+  "lang": "ko",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,8 +1,8 @@
 FROM python:3.12-slim
 
-# LibreOffice: PPT/ODT -> PDF 변환 엔진, noto-cjk: 한글 폰트 (없으면 한글이 깨짐)
+# LibreOffice(writer/impress/calc): 오피스·한글 문서 변환 엔진, noto-cjk: 한글 폰트
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libreoffice-impress libreoffice-writer fonts-noto-cjk \
+        libreoffice-impress libreoffice-writer libreoffice-calc fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

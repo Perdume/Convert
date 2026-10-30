@@ -64,6 +64,13 @@ class Job:
     created: float = field(default_factory=time.time)
     result_path: Path | None = None
     download_name: str = ""
+    # 암호 문서가 비밀번호 입력을 기다리는 동안 보관하는 상태 (TTL 지나면 자동 삭제)
+    src_path: Path | None = None
+    src_fmt: str = ""
+    target: str = ""
+    original_filename: str = ""
+    encrypted: bool = False
+    attempts: int = 0
 
 
 class JobStore:

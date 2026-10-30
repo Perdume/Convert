@@ -3,19 +3,21 @@
 모든 변환은 서버 내부에서만 수행된다 — 파일이 외부 서비스로 전송되지 않는다.
 
 변환 경로:
-  PPT/PPTX → PDF   : LibreOffice headless
-  HWP → PDF        : pyhwp(HWP→ODT) → LibreOffice(ODT→PDF)
-  PDF → PPTX       : 페이지를 고해상도 이미지로 렌더링해 슬라이드로 배치
-  HWP → PPTX       : HWP→PDF→PPTX
-  PDF/PPT → HWPX   : 페이지 이미지를 한글(HWPX) 문서로 배치
+  무엇이든 → PDF        : 오피스/한글은 LibreOffice, 이미지는 PyMuPDF
+  오피스 ↔ 오피스(편집) : LibreOffice (doc/odt/rtf/txt↔docx, ppt/odp→pptx, xls/ods→xlsx)
+  HWP → 편집 가능 문서  : pyhwp(HWP→ODT) → LibreOffice(ODT→docx/pdf/txt…)
+  PDF/문서 → PPTX/HWPX/DOCX : 각 페이지를 고해상도 이미지로 렌더링해 배치
+  문서 → 이미지(ZIP)    : 각 페이지를 PNG로 렌더링해 ZIP으로 묶음
+  문서 → TXT            : 글자만 추출 (PDF는 PyMuPDF, 그 외는 LibreOffice)
 """
 import io
 import logging
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
-import fitz  # PyMuPDF
+import pymupdf as fitz  # PyMuPDF (구 fitz)
 from pptx import Presentation
 from pptx.util import Emu
 
@@ -44,13 +46,12 @@ def _run(cmd: list[str], cwd: Path | None = None) -> None:
     except subprocess.TimeoutExpired:
         raise ConversionError("변환 시간이 초과되었습니다.")
     if proc.returncode != 0:
-        # 내부 오류 상세는 서버 로그에만 남기고, 사용자에게는 일반화된 메시지만 보낸다
         detail = (proc.stderr or proc.stdout or b"")[:4000].decode("utf-8", "replace")
         logger.error("conversion subprocess failed (rc=%s, cmd=%s): %s",
                       proc.returncode, cmd[0], detail.strip())
         lowered = detail.lower()
         if "password" in lowered or "encrypt" in lowered or "distribut" in lowered:
-            raise ConversionError("암호화되었거나 배포용(보안) 문서는 변환할 수 없습니다.")
+            raise ConversionError("암호화되었거나 배포용(보안) 문서는 변환할 수 없습니다. 먼저 암호를 해제해 주세요.")
         raise ConversionError(
             "파일을 변환하지 못했습니다. 문서가 손상되었거나 "
             "지원하지 않는 형식·기능을 포함하고 있을 수 있습니다.")
@@ -83,15 +84,32 @@ def _hwp_to_odt(src: Path, outdir: Path) -> Path:
     return out
 
 
-def _render_pdf_pages(pdf_path: Path, dpi: int = 150):
+def _image_to_pdf(src: Path, outdir: Path) -> Path:
+    try:
+        doc = fitz.open(str(src))
+        try:
+            pdf_bytes = doc.convert_to_pdf()
+        finally:
+            doc.close()
+    except ConversionError:
+        raise
+    except Exception:
+        raise ConversionError("이미지를 열 수 없습니다. 파일이 손상되었을 수 있습니다.")
+    out = outdir / "result.pdf"
+    out.write_bytes(pdf_bytes)
+    return out
+
+
+def _render_pdf_pages(pdf_path: Path, dpi: int | None = None):
     """PDF 각 페이지를 (PNG bytes, 폭 pt, 높이 pt)로 렌더링한다."""
+    dpi = dpi or config.IMAGE_DPI
     try:
         doc = fitz.open(str(pdf_path))
     except Exception:
         raise ConversionError("PDF 파일을 열 수 없습니다. 파일이 손상되었을 수 있습니다.")
     try:
         if doc.needs_pass:
-            raise ConversionError("암호로 보호된 PDF는 변환할 수 없습니다.")
+            raise ConversionError("암호로 보호된 PDF입니다. 먼저 암호를 해제해 주세요.")
         if doc.page_count == 0:
             raise ConversionError("페이지가 없는 PDF입니다.")
         if doc.page_count > config.MAX_PDF_PAGES:
@@ -148,61 +166,132 @@ def _pdf_to_hwpx(pdf_path: Path, outdir: Path) -> Path:
 def _pdf_to_docx(pdf_path: Path, outdir: Path) -> Path:
     """PDF 페이지를 전면 이미지로 배치한 워드 문서를 만든다."""
     from docx import Document
-    from docx.shared import Emu
+    from docx.shared import Emu as DocxEmu
 
     doc = Document()
     section = doc.sections[0]
     first = True
     for png, w_pt, h_pt in _render_pdf_pages(pdf_path):
         if first:
-            section.page_width = Emu(int(w_pt * _EMU_PER_PT))
-            section.page_height = Emu(int(h_pt * _EMU_PER_PT))
-            section.left_margin = section.right_margin = Emu(0)
-            section.top_margin = section.bottom_margin = Emu(0)
-            section.header_distance = section.footer_distance = Emu(0)
+            section.page_width = DocxEmu(int(w_pt * _EMU_PER_PT))
+            section.page_height = DocxEmu(int(h_pt * _EMU_PER_PT))
+            section.left_margin = section.right_margin = DocxEmu(0)
+            section.top_margin = section.bottom_margin = DocxEmu(0)
+            section.header_distance = section.footer_distance = DocxEmu(0)
             first = False
         p = doc.add_paragraph()  # 한 문단 = 한 페이지
-        p.paragraph_format.space_before = Emu(0)
-        p.paragraph_format.space_after = Emu(0)
+        p.paragraph_format.space_before = DocxEmu(0)
+        p.paragraph_format.space_after = DocxEmu(0)
         p.add_run().add_picture(io.BytesIO(png),
-                                width=Emu(int(w_pt * _EMU_PER_PT)),
-                                height=Emu(int(h_pt * _EMU_PER_PT)))
+                                width=DocxEmu(int(w_pt * _EMU_PER_PT)),
+                                height=DocxEmu(int(h_pt * _EMU_PER_PT)))
     out = outdir / "result.docx"
     doc.save(str(out))
     return out
 
 
+def _pdf_to_images_zip(pdf_path: Path, outdir: Path) -> Path:
+    """PDF 각 페이지를 PNG로 렌더링해 ZIP 한 개로 묶는다."""
+    out = outdir / "result.zip"
+    count = 0
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for i, (png, _w, _h) in enumerate(_render_pdf_pages(pdf_path), 1):
+            z.writestr(f"page_{i:03d}.png", png)
+            count += 1
+    if count == 0:
+        raise ConversionError("변환할 페이지가 없습니다.")
+    return out
+
+
+def _to_txt(src: Path, src_fmt: str, outdir: Path) -> Path:
+    out = outdir / "result.txt"
+    if src_fmt == "pdf":
+        try:
+            doc = fitz.open(str(src))
+        except Exception:
+            raise ConversionError("PDF 파일을 열 수 없습니다.")
+        try:
+            if doc.needs_pass:
+                raise ConversionError("암호로 보호된 PDF입니다. 먼저 암호를 해제해 주세요.")
+            parts = [page.get_text() for page in doc]
+        finally:
+            doc.close()
+        out.write_text("\n\n".join(parts), encoding="utf-8")
+        return out
+    if src_fmt == "hwp":
+        odt = _hwp_to_odt(src, outdir)
+        return _soffice_convert(odt, "txt", outdir)
+    if src_fmt in config.CAT_DOC:
+        return _soffice_convert(src, "txt", outdir)
+    raise ConversionError("이 형식은 텍스트로 변환할 수 없습니다.")
+
+
 def _to_pdf(src: Path, src_fmt: str, outdir: Path) -> Path:
     if src_fmt == "pdf":
         return src
-    if src_fmt in ("ppt", "pptx"):
-        return _soffice_convert(src, "pdf", outdir)
+    if src_fmt in config.CAT_IMAGE:
+        return _image_to_pdf(src, outdir)
     if src_fmt == "hwp":
         odt = _hwp_to_odt(src, outdir)
         return _soffice_convert(odt, "pdf", outdir)
+    if src_fmt in (config.CAT_DOC | config.CAT_PRES | config.CAT_SHEET):
+        return _soffice_convert(src, "pdf", outdir)
     raise ConversionError("지원하지 않는 입력 형식입니다.")
 
 
 def convert(src: Path, src_fmt: str, target: str, outdir: Path) -> Path:
     """src(형식 src_fmt)를 target 형식으로 변환해 결과 경로를 돌려준다."""
+    DOC, PRES, SHEET = config.CAT_DOC, config.CAT_PRES, config.CAT_SHEET
+
     if target == "pdf":
-        result = _to_pdf(src, src_fmt, outdir)
-        if result == src:
+        if src_fmt == "pdf":
             raise ConversionError("이미 PDF 파일입니다.")
-        return result
+        return _to_pdf(src, src_fmt, outdir)
+
+    if target == "docx":
+        if src_fmt == "docx":
+            raise ConversionError("이미 워드(DOCX) 파일입니다.")
+        if src_fmt == "hwp":
+            odt = _hwp_to_odt(src, outdir)
+            return _soffice_convert(odt, "docx", outdir)
+        if src_fmt in DOC:                      # doc/odt/rtf/txt → 편집 가능한 워드
+            return _soffice_convert(src, "docx", outdir)
+        return _pdf_to_docx(_to_pdf(src, src_fmt, outdir), outdir)  # pdf/ppt/이미지 → 페이지 이미지
+
+    if target == "odt":
+        if src_fmt == "odt":
+            raise ConversionError("이미 ODT 파일입니다.")
+        if src_fmt == "hwp":
+            return _hwp_to_odt(src, outdir)      # HWP → ODT (바로 생성됨)
+        if src_fmt in DOC:
+            return _soffice_convert(src, "odt", outdir)
+        raise ConversionError("이 형식은 ODT로 변환할 수 없습니다.")
+
     if target == "pptx":
-        if src_fmt in ("ppt", "pptx"):
-            raise ConversionError("이미 PPT 파일입니다.")
+        if src_fmt == "pptx":
+            raise ConversionError("이미 파워포인트(PPTX) 파일입니다.")
+        if src_fmt in PRES:                      # ppt/odp → 편집 가능한 pptx
+            return _soffice_convert(src, "pptx", outdir)
         return _pdf_to_pptx(_to_pdf(src, src_fmt, outdir), outdir)
+
+    if target == "xlsx":
+        if src_fmt == "xlsx":
+            raise ConversionError("이미 엑셀(XLSX) 파일입니다.")
+        if src_fmt in SHEET:                     # xls/ods/csv → 편집 가능한 엑셀
+            return _soffice_convert(src, "xlsx", outdir)
+        raise ConversionError("이 형식은 엑셀로 변환할 수 없습니다.")
+
     if target == "hwpx":
         if src_fmt == "hwp":
             raise ConversionError("이미 한글 파일입니다.")
         return _pdf_to_hwpx(_to_pdf(src, src_fmt, outdir), outdir)
-    if target == "docx":
-        # 한컴오피스 없이 MS워드·구글 Docs에서 열 수 있는 형식.
-        # HWP는 문서를 해석해 편집 가능한 워드로, PDF/PPT는 페이지 이미지로 배치한다.
-        if src_fmt == "hwp":
-            odt = _hwp_to_odt(src, outdir)
-            return _soffice_convert(odt, "docx", outdir)
-        return _pdf_to_docx(_to_pdf(src, src_fmt, outdir), outdir)
+
+    if target == "images":
+        return _pdf_to_images_zip(_to_pdf(src, src_fmt, outdir), outdir)
+
+    if target == "txt":
+        if src_fmt == "txt":
+            raise ConversionError("이미 텍스트 파일입니다.")
+        return _to_txt(src, src_fmt, outdir)
+
     raise ConversionError("지원하지 않는 변환 형식입니다.")

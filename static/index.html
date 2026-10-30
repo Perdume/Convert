@@ -1,65 +1,141 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="referrer" content="no-referrer">
-  <title>문서 변환기 — HWP · PPT · PDF</title>
+  <meta name="description" content="HWP·PDF·워드·엑셀·파워포인트·이미지를 서로 변환하고, 암호 문서는 비밀번호를 입력해 해제한 뒤 변환하는 웹앱. 파일은 변환 후 즉시 삭제됩니다.">
+  <meta name="theme-color" id="themeColor" content="#0f1424">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="문서 변환기">
+  <title>문서 변환기 — HWP · PDF · 오피스 · 이미지</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <main class="card">
-    <h1>문서 변환기</h1>
-    <p class="subtitle">한글(HWP) · 파워포인트(PPT) · PDF를 서로 변환합니다</p>
+  <div class="bg" aria-hidden="true"></div>
 
-    <div id="dropzone" class="dropzone" tabindex="0" role="button"
-         aria-label="파일 선택 또는 드래그">
-      <input type="file" id="fileInput" accept=".hwp,.ppt,.pptx,.pdf" hidden>
-      <div id="dropzoneIdle">
-        <div class="dz-icon">&#128196;</div>
-        <p><strong>파일을 끌어다 놓거나 클릭하여 선택</strong></p>
-        <p class="dz-hint">HWP, PPT/PPTX, PDF · 최대 50MB</p>
+  <main class="card" id="card">
+    <button type="button" id="themeToggle" class="icon-btn theme-toggle" aria-label="밝은/어두운 테마 전환" title="테마 전환">
+      <svg class="ico-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      <svg class="ico-moon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+
+    <header class="head">
+      <img class="logo" src="/icons/icon-192.png" alt="" width="52" height="52">
+      <div>
+        <h1>문서 변환기</h1>
+        <p class="subtitle">HWP·PDF·워드·엑셀·PPT·이미지를 서로 변환</p>
       </div>
-      <div id="dropzoneFile" hidden>
-        <p id="fileName" class="file-name"></p>
-        <p id="fileSize" class="dz-hint"></p>
-        <button type="button" id="clearFile" class="link-btn">다른 파일 선택</button>
+    </header>
+
+    <!-- 1. 업로드 -->
+    <section id="sDrop">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="파일 선택 또는 드래그하여 업로드">
+        <input type="file" id="fileInput" accept=".hwp,.doc,.docx,.odt,.rtf,.txt,.ppt,.pptx,.odp,.xls,.xlsx,.ods,.csv,.pdf,.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp,.gif" hidden>
+        <svg class="dz-icon" viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 16v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/></svg>
+        <p class="dz-title">파일을 끌어다 놓거나 <span class="dz-link">클릭하여 선택</span></p>
+        <p class="dz-hint" id="dzHint">HWP · 오피스 · PDF · 이미지 · 최대 100MB</p>
+        <p class="dz-hint dz-paste">붙여넣기(Ctrl/⌘+V)도 됩니다</p>
       </div>
-    </div>
+    </section>
 
-    <div id="targetSection" class="target-section" hidden>
-      <p class="label">변환할 형식</p>
-      <div id="targetOptions" class="target-options"></div>
-      <p id="targetHint" class="dz-hint target-hint"></p>
-      <button type="button" id="convertBtn" class="primary-btn" disabled>변환하기</button>
-    </div>
+    <!-- 2. 선택된 파일 + 형식 선택 -->
+    <section id="sPick" hidden>
+      <div class="file-card">
+        <span class="badge" id="fileBadge">PDF</span>
+        <div class="file-meta">
+          <p class="file-name" id="fileName"></p>
+          <p class="file-size" id="fileSize"></p>
+        </div>
+        <button type="button" id="clearFile" class="icon-btn" aria-label="파일 제거" title="파일 제거">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
 
-    <div id="progress" class="progress" hidden>
-      <div class="spinner"></div>
-      <p>변환 중입니다… 잠시만 기다려주세요.</p>
-    </div>
+      <!-- 암호 문서 패널 (서버가 암호 걸림을 알려줄 때만 표시) -->
+      <div id="pwPanel" class="pw-panel" hidden>
+        <div class="pw-head">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          <div>
+            <p class="pw-title">암호가 걸린 문서입니다</p>
+            <p class="pw-desc">이 문서의 비밀번호를 입력하면 암호를 해제한 뒤 변환합니다.</p>
+          </div>
+        </div>
+        <div class="pw-input">
+          <input type="password" id="pwInput" placeholder="문서 비밀번호" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go">
+          <button type="button" id="pwToggle" class="icon-btn" aria-label="비밀번호 표시/숨기기" title="표시/숨기기">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <p class="pw-msg" id="pwMsg" role="alert" hidden></p>
+        <button type="button" id="unlockOnlyBtn" class="link-btn">암호만 해제하고 원본 형식으로 받기</button>
+      </div>
 
-    <div id="result" class="result" hidden>
-      <p class="result-title">&#9989; 변환이 완료되었습니다</p>
-      <a id="downloadLink" class="primary-btn" download>다운로드</a>
-      <p class="dz-hint">다운로드하면 서버에서 파일이 즉시 삭제됩니다.<br>
-        다운로드하지 않아도 10분 뒤 자동 삭제됩니다.</p>
-      <button type="button" id="restartBtn" class="link-btn">새 파일 변환하기</button>
-    </div>
+      <div id="targetBlock">
+        <p class="label">변환할 형식</p>
+        <div id="targetOptions" class="target-options" role="radiogroup" aria-label="변환할 형식"></div>
+        <p id="targetHint" class="target-hint" aria-live="polite"></p>
+      </div>
 
-    <div id="error" class="error" hidden>
+      <button type="button" id="convertBtn" class="primary-btn">
+        <span id="convertBtnText">변환하기</span>
+      </button>
+    </section>
+
+    <!-- 3. 진행 -->
+    <section id="sProgress" hidden>
+      <div class="progress">
+        <div class="spinner" id="spinner"><svg viewBox="0 0 50 50" width="52" height="52"><circle class="sp-track" cx="25" cy="25" r="20" fill="none" stroke-width="5"/><circle class="sp-arc" cx="25" cy="25" r="20" fill="none" stroke-width="5" stroke-linecap="round"/></svg></div>
+        <p class="progress-text" id="progressText">변환 중입니다…</p>
+        <p class="dz-hint" id="progressSub">잠시만 기다려주세요.</p>
+      </div>
+    </section>
+
+    <!-- 4. 결과 -->
+    <section id="sResult" hidden>
+      <div class="result">
+        <div class="result-check"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <p class="result-title">변환이 완료되었습니다</p>
+        <a id="downloadLink" class="primary-btn" download>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+          <span id="downloadText">다운로드</span>
+        </a>
+        <p class="dz-hint result-note">다운로드하면 서버에서 즉시 삭제됩니다. 받지 않아도 10분 뒤 자동 삭제됩니다.</p>
+        <button type="button" id="restartBtn" class="link-btn">새 파일 변환하기</button>
+      </div>
+    </section>
+
+    <!-- 오류 -->
+    <div id="errorBox" class="error" role="alert" hidden>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5h.01"/></svg>
       <p id="errorMsg"></p>
-      <button type="button" id="retryBtn" class="link-btn">다시 시도</button>
+      <button type="button" id="errorClose" class="icon-btn" aria-label="닫기"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
 
-    <footer>
+    <footer class="foot">
+      <button type="button" id="installBtn" class="install-btn" hidden>
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        앱으로 설치하기
+      </button>
+
+      <details class="matrix">
+        <summary>지원하는 변환 한눈에 보기</summary>
+        <div id="matrixBody" class="matrix-body"></div>
+      </details>
+
       <ul class="security-notes">
-        <li>&#128274; 모든 변환은 서버 내부에서만 처리되며 외부로 전송되지 않습니다.</li>
-        <li>&#128465;&#65039; 업로드한 원본은 변환 즉시, 결과물은 다운로드 즉시 완전 삭제됩니다.</li>
-        <li>&#128196; 한글 형식으로의 변환 결과는 HWPX(한글 2014 이상)로 저장됩니다.</li>
+        <li><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> 모든 변환은 서버 내부에서만 처리되며 외부로 전송되지 않습니다.</li>
+        <li><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg> 원본은 변환 즉시, 결과물은 다운로드 즉시 완전 삭제됩니다.</li>
+        <li><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg> 암호 문서는 입력한 비밀번호로만 해제하며, 비밀번호는 저장하지 않습니다.</li>
       </ul>
     </footer>
   </main>
+
   <script src="/app.js"></script>
 </body>
 </html>

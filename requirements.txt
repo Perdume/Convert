@@ -10,3 +10,5 @@ six>=1.16
 lxml>=5.0
 olefile>=0.47
 python-hwpx>=2.9
+pikepdf>=8.0
+msoffcrypto-tool>=5.4
