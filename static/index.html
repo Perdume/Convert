@@ -18,7 +18,7 @@
       <div id="dropzoneIdle">
         <div class="dz-icon">&#128196;</div>
         <p><strong>파일을 끌어다 놓거나 클릭하여 선택</strong></p>
-        <p class="dz-hint">HWP, PPT/PPTX, PDF · 최대 50MB</p>
+        <p class="dz-hint">HWP, PPT/PPTX, PDF · 최대 50MB · Ctrl+V로 붙여넣기도 가능</p>
       </div>
       <div id="dropzoneFile" hidden>
         <p id="fileName" class="file-name"></p>
@@ -36,7 +36,8 @@
 
     <div id="progress" class="progress" hidden>
       <div class="spinner"></div>
-      <p>변환 중입니다… 잠시만 기다려주세요.</p>
+      <p id="progressText" role="status" aria-live="polite">변환 중입니다… 잠시만 기다려주세요.</p>
+      <progress id="progressBar" max="100" value="0" hidden></progress>
     </div>
 
     <div id="result" class="result" hidden>

@@ -17,8 +17,18 @@ MAX_CONCURRENT_CONVERSIONS = int(os.environ.get("MAX_CONCURRENT_CONVERSIONS", "2
 RATE_LIMIT_MAX = 10                       # IP당 분당 변환 요청 수
 RATE_LIMIT_WINDOW = 60
 
-INPUT_FORMATS = {"hwp", "ppt", "pptx", "pdf"}
-OUTPUT_FORMATS = {"pdf", "pptx", "hwpx", "docx"}
+APP_VERSION = "1.1.0"
+
+# 입력 형식별로 변환 가능한 출력 형식. 웹 화면과 안드로이드 앱은 /api/info로
+# 이 표를 받아 선택지를 그리므로, 변환 경로를 추가할 때는 여기만 고치면 된다.
+CONVERSIONS: dict[str, tuple[str, ...]] = {
+    "hwp":  ("pdf", "pptx", "docx"),
+    "ppt":  ("pdf", "hwpx", "docx"),
+    "pptx": ("pdf", "hwpx", "docx"),
+    "pdf":  ("pptx", "hwpx", "docx"),
+}
+INPUT_FORMATS = set(CONVERSIONS)
+OUTPUT_FORMATS = {t for targets in CONVERSIONS.values() for t in targets}
 
 
 def _find_soffice() -> str | None:

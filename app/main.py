@@ -50,6 +50,20 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
 app.add_middleware(security.SecurityHeadersMiddleware)
 
 
+@app.get("/api/info")
+async def api_info():
+    """서버 상태·제한값·변환 가능 조합. 앱의 연결 테스트(무료 서버 깨우기)에도 쓰인다."""
+    return {
+        "service": "convert",
+        "version": config.APP_VERSION,
+        "ready": config.SOFFICE is not None,
+        "max_upload_mb": config.MAX_UPLOAD_BYTES // (1024 * 1024),
+        "max_pdf_pages": config.MAX_PDF_PAGES,
+        "result_ttl_seconds": config.JOB_TTL_SECONDS,
+        "conversions": {src: list(dst) for src, dst in config.CONVERSIONS.items()},
+    }
+
+
 @app.post("/api/convert")
 async def api_convert(
     request: Request,
@@ -57,8 +71,11 @@ async def api_convert(
     target: str = Form(...),
 ):
     client_ip = request.client.host if request.client else "unknown"
-    if not rate_limiter.allow(client_ip):
-        raise HTTPException(429, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.")
+    wait = rate_limiter.check(client_ip)
+    if wait:
+        # Retry-After: 클라이언트가 몇 초 뒤 재시도하면 되는지 알려준다 (일괄 변환용)
+        raise HTTPException(429, f"요청이 너무 많습니다. {wait}초 후 다시 시도해주세요.",
+                            headers={"Retry-After": str(wait)})
 
     target = target.lower().strip()
     if target not in config.OUTPUT_FORMATS:
@@ -67,6 +84,10 @@ async def api_convert(
     ext = Path(file.filename or "").suffix.lower().lstrip(".")
     if ext not in config.INPUT_FORMATS:
         raise HTTPException(400, "지원 형식: HWP, PPT/PPTX, PDF")
+
+    if target not in config.CONVERSIONS[ext]:
+        allowed = ", ".join(t.upper() for t in config.CONVERSIONS[ext])
+        raise HTTPException(400, f"{ext.upper()} 파일은 {allowed} 형식으로만 변환할 수 있습니다.")
 
     job = job_store.create()
     src = job.dir / f"input.{ext}"

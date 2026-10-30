@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-import fitz  # PyMuPDF
+import pymupdf as fitz  # PyMuPDF (구 모듈명 fitz는 향후 제거 예정)
 from pptx import Presentation
 from pptx.util import Emu
 

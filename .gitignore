@@ -3,3 +3,12 @@ __pycache__/
 *.pyc
 data/
 .env
+
+# Android
+android/local.properties
+android/keystore.properties
+android/.gradle/
+android/build/
+android/app/build/
+*.jks
+*.keystore

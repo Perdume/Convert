@@ -1,4 +1,5 @@
 """업로드 검증(매직 바이트), IP 레이트리밋, 보안 응답 헤더."""
+import math
 import re
 import threading
 import time
@@ -77,19 +78,28 @@ class RateLimiter:
         self._lock = threading.Lock()
 
     def allow(self, key: str) -> bool:
+        return self.check(key) == 0
+
+    def check(self, key: str) -> int:
+        """요청을 허용하면 0, 거부하면 다시 시도할 수 있을 때까지 남은 초를 돌려준다.
+
+        남은 시간은 429 응답의 Retry-After 헤더로 내려가, 앱·웹 화면이
+        여러 파일을 일괄 변환할 때 알아서 기다렸다가 재시도할 수 있게 한다.
+        """
         now = time.monotonic()
         with self._lock:
             q = self._hits.setdefault(key, deque())
             while q and now - q[0] > self.window:
                 q.popleft()
             if len(q) >= self.max:
-                return False
+                return max(1, math.ceil(self.window - (now - q[0])))
             q.append(now)
-            # 오래된 키 정리
+            # 오래된 키 정리: 마지막 요청이 윈도 밖인 키는 더 이상 의미가 없다
             if len(self._hits) > 10000:
-                for k in [k for k, v in self._hits.items() if not v]:
+                for k in [k for k, v in self._hits.items()
+                          if not v or now - v[-1] > self.window]:
                     del self._hits[k]
-            return True
+            return 0
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

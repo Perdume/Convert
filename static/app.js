@@ -68,15 +68,25 @@ function pickFile(file) {
     input.type = "radio";
     input.name = "target";
     input.value = t.value;
-    if (i === 0) input.checked = true;
-    input.addEventListener("change", () => updateHint(fmt));
+    if (t.value === preferredTarget(fmt)) input.checked = true;
+    input.addEventListener("change", () => { rememberTarget(fmt, t.value); updateHint(fmt); });
     label.appendChild(input);
     label.appendChild(document.createTextNode(t.label));
     opts.appendChild(label);
   });
+  if (!opts.querySelector("input:checked")) opts.querySelector("input").checked = true;
   updateHint(fmt);
   $("convertBtn").disabled = false;
   show("picked");
+}
+
+// 마지막으로 고른 변환 형식을 원본 형식별로 기억 (저장소를 쓸 수 없으면 조용히 무시)
+function preferredTarget(fmt) {
+  try { return localStorage.getItem("target:" + fmt) || TARGETS[fmt][0].value; }
+  catch (_) { return TARGETS[fmt][0].value; }
+}
+function rememberTarget(fmt, value) {
+  try { localStorage.setItem("target:" + fmt, value); } catch (_) { /* 무시 */ }
 }
 
 function updateHint(srcFmt) {
@@ -89,41 +99,79 @@ function updateHint(srcFmt) {
   $("targetHint").textContent = hint;
 }
 
+function setProgress(text, percent) {
+  $("progressText").textContent = text;
+  const bar = $("progressBar");
+  bar.hidden = percent == null;
+  if (percent != null) bar.value = percent;
+}
+
+function sendOnce(file, target) {
+  return new Promise((resolve) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("target", target);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/convert");
+    xhr.responseType = "json";
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      const pct = Math.round((e.loaded / e.total) * 100);
+      setProgress(pct < 100 ? "업로드 중… " + pct + "%" : "변환 중입니다… 잠시만 기다려주세요.",
+                  pct < 100 ? pct : null);
+    };
+    xhr.onload = () => resolve({ status: xhr.status, body: xhr.response,
+                                 retryAfter: parseInt(xhr.getResponseHeader("Retry-After"), 10) || 0 });
+    xhr.onerror = () => resolve({ status: 0 });
+    xhr.send(form);
+  });
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function convert() {
   const target = document.querySelector('input[name="target"]:checked');
   if (!selectedFile || !target) return;
 
   show("progress");
-  const form = new FormData();
-  form.append("file", selectedFile);
-  form.append("target", target.value);
+  setProgress("업로드 준비 중…", 0);
 
-  try {
-    const res = await fetch("/api/convert", { method: "POST", body: form });
-    if (!res.ok) {
-      let msg = "변환 중 오류가 발생했습니다.";
-      try {
-        const body = await res.json();
-        if (body.detail) msg = body.detail;
-      } catch (_) { /* 응답이 JSON이 아닌 경우 */ }
-      return showError(msg);
+  let res = await sendOnce(selectedFile, target.value);
+  // 요청이 너무 많으면(429) 서버가 알려준 시간만큼 기다렸다가 한 번 자동으로 다시 시도
+  if (res.status === 429 && res.retryAfter > 0 && res.retryAfter <= 120) {
+    for (let s = res.retryAfter; s > 0; s--) {
+      setProgress("요청이 몰려 " + s + "초 뒤 자동으로 다시 시도합니다…", null);
+      await sleep(1000);
     }
-    const body = await res.json();
-    const link = $("downloadLink");
-    link.href = "/api/download/" + encodeURIComponent(body.token);
-    link.setAttribute("download", body.filename);
-    link.textContent = body.filename + " 다운로드";
-    show("result");
-  } catch (_) {
-    showError("서버에 연결할 수 없습니다.");
+    setProgress("업로드 준비 중…", 0);
+    res = await sendOnce(selectedFile, target.value);
   }
+
+  if (res.status === 0) return showError("서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.");
+  if (res.status < 200 || res.status >= 300) {
+    const detail = res.body && res.body.detail;
+    return showError(typeof detail === "string" ? detail : "변환 중 오류가 발생했습니다.");
+  }
+  const link = $("downloadLink");
+  link.href = "/api/download/" + encodeURIComponent(res.body.token);
+  link.setAttribute("download", res.body.filename);
+  link.textContent = res.body.filename + " 다운로드";
+  show("result");
+  link.focus();
 }
 
 function reset() {
   selectedFile = null;
   $("fileInput").value = "";
   $("convertBtn").disabled = true;
-  show("idle");
+  // Ctrl+V(클립보드의 파일 붙여넣기)로도 파일을 선택할 수 있게
+document.addEventListener("paste", (e) => {
+  if ($("dropzone").hidden) return;
+  const files = e.clipboardData && e.clipboardData.files;
+  if (files && files.length) { e.preventDefault(); pickFile(files[0]); }
+});
+
+show("idle");
 }
 
 const dz = $("dropzone");
@@ -145,5 +193,12 @@ $("clearFile").addEventListener("click", (e) => { e.stopPropagation(); reset(); 
 $("convertBtn").addEventListener("click", convert);
 $("restartBtn").addEventListener("click", reset);
 $("retryBtn").addEventListener("click", () => { $("error").hidden = true; });
+
+// Ctrl+V(클립보드의 파일 붙여넣기)로도 파일을 선택할 수 있게
+document.addEventListener("paste", (e) => {
+  if ($("dropzone").hidden) return;
+  const files = e.clipboardData && e.clipboardData.files;
+  if (files && files.length) { e.preventDefault(); pickFile(files[0]); }
+});
 
 show("idle");
