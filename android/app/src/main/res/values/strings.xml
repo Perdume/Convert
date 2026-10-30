@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">문서 변환기</string>
+    <string name="setup_prompt">연결할 변환 서버 주소를 입력하세요.\n(직접 배포한 서버의 주소)</string>
+    <string name="setup_error">서버에 연결할 수 없습니다.\n주소가 맞는지 확인한 뒤 다시 시도하세요.</string>
+    <string name="connect">연결</string>
 </resources>
